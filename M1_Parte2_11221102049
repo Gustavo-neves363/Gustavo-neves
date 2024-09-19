@@ -1,0 +1,200 @@
+CREATE SCHEMA veterinario;
+USE veterinario;
+
+CREATE TABLE Pacientes (
+  id_paciente INT PRIMARY KEY AUTO_INCREMENT,
+  nome VARCHAR(100),
+  especie VARCHAR(50),
+  idade INT
+);
+
+CREATE TABLE Veterinários (
+  id_veterinario INT PRIMARY KEY AUTO_INCREMENT,
+  nome VARCHAR(100),
+  especialidade VARCHAR(50)
+);
+
+CREATE TABLE Consultas (
+  id_consulta INT PRIMARY KEY AUTO_INCREMENT,
+  id_paciente INT,
+  id_veterinario INT,
+  data_consulta DATE,
+  custo DECIMAL(10, 2),
+  FOREIGN KEY (id_paciente) REFERENCES Pacientes(id_paciente),
+  FOREIGN KEY (id_veterinario) REFERENCES Veterinários(id_veterinario)
+);
+
+DELIMITER //
+CREATE PROCEDURE agendar_consulta(
+  IN id_paciente INT,
+  IN id_veterinario INT,
+  IN data_consulta DATE,
+  IN custo DECIMAL(10, 2)
+)
+BEGIN
+  INSERT INTO Consultas (id_paciente, id_veterinario, data_consulta, custo)
+  VALUES (id_paciente, id_veterinario, data_consulta, custo);
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE atualizar_paciente(
+  IN id_paciente INT,
+  IN novo_nome VARCHAR(100),
+  IN nova_especie VARCHAR(50),
+  IN nova_idade INT
+)
+BEGIN
+  UPDATE Pacientes
+  SET nome = novo_nome, especie = nova_especie, idade = nova_idade
+  WHERE id_paciente = id_paciente;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE remover_consulta(
+  IN id_consulta INT
+)
+BEGIN
+  DELETE FROM Consultas
+  WHERE id_consulta = id_consulta;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION total_gasto_paciente(id_paciente INT)
+RETURNS DECIMAL(10, 2)
+BEGIN
+  DECLARE total_gasto DECIMAL(10, 2);
+  SELECT SUM(custo) INTO total_gasto
+  FROM Consultas
+  WHERE id_paciente = id_paciente;
+  RETURN total_gasto;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER verificar_idade_paciente
+BEFORE INSERT ON Pacientes
+FOR EACH ROW
+BEGIN
+  IF NEW.idade <= 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Idade do paciente deve ser um número positivo.';
+  END IF;
+END//
+DELIMITER ;
+
+CREATE TABLE Log_Consultas (
+  id_log INT PRIMARY KEY AUTO_INCREMENT,
+  id_consulta INT,
+  custo_antigo DECIMAL(10, 2),
+  custo_novo DECIMAL(10, 2)
+);
+
+DELIMITER //
+CREATE TRIGGER atualizar_custo_consulta
+AFTER UPDATE ON Consultas
+FOR EACH ROW
+BEGIN
+  IF NEW.custo != OLD.custo THEN
+    INSERT INTO Log_Consultas (id_consulta, custo_antigo, custo_novo)
+    VALUES (NEW.id_consulta, OLD.custo, NEW.custo);
+  END IF;
+END//
+DELIMITER ;
+
+CREATE TABLE Medicamentos (
+  id_medicamento INT PRIMARY KEY AUTO_INCREMENT,
+  nome VARCHAR(100),
+  descricao VARCHAR(200),
+  preco DECIMAL(10, 2)
+);
+
+CREATE TABLE Receitas (
+  id_receita INT PRIMARY KEY AUTO_INCREMENT,
+  id_paciente INT,
+  id_veterinario INT,
+  id_medicamento INT,
+  data_receita DATE,
+  quantidade INT,
+  FOREIGN KEY (id_paciente) REFERENCES Pacientes(id_paciente),
+  FOREIGN KEY (id_veterinario) REFERENCES Veterinários(id_veterinario),
+  FOREIGN KEY (id_medicamento) REFERENCES Medicamentos(id_medicamento)
+);
+
+CREATE TABLE Pagamentos (
+  id_pagamento INT PRIMARY KEY AUTO_INCREMENT,
+  id_paciente INT,
+  data_pagamento DATE,
+  valor DECIMAL(10, 2),
+  FOREIGN KEY (id_paciente) REFERENCES Pacientes(id_paciente)
+);
+
+DELIMITER //
+CREATE TRIGGER verificar_quantidade_receita
+BEFORE INSERT ON Receitas
+FOR EACH ROW
+BEGIN
+  IF NEW.quantidade <= 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Quantidade de medicamento deve ser um número positivo.';
+  END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER atualizar_valor_pagamento
+AFTER INSERT ON Pagamentos
+FOR EACH ROW
+BEGIN
+  UPDATE Pacientes
+  SET saldo = saldo - NEW.valor
+  WHERE id_paciente = NEW.id_paciente;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER verificar_saldo_paciente
+BEFORE UPDATE ON Pacientes
+FOR EACH ROW
+BEGIN
+  IF NEW.saldo < 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Saldo do paciente não pode ser negativo.';
+  END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE emitir_receita(
+  IN id_paciente INT,
+  IN id_veterinario INT,
+  IN id_medicamento INT,
+  IN quantidade INT,
+  IN data_receita DATE
+)
+BEGIN
+  INSERT INTO Receitas (id_paciente, id_veterinario, id_medicamento, quantidade, data_receita)
+  VALUES (id_paciente, id_veterinario, id_medicamento, quantidade, data_receita);
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE realizar_pagamento(
+  IN id_paciente INT,
+  IN valor DECIMAL(10, 2),
+  IN data_pagamento DATE
+)
+BEGIN
+  INSERT INTO Pagamentos (id_paciente, valor, data_pagamento)
+  VALUES (id_paciente, valor, data_pagamento);
+  UPDATE Pacientes
+  SET saldo = saldo - valor
+  WHERE id_paciente = id_paciente;
+END//
+DELIMITER ;
+
+-- Test the procedures
+CALL agendar_consulta(1, 1, '2022-01-01', 100.00);
+CALL atualizar_paciente(1, 'Novo Nome', 'Nova Espécie', 5);
+CALL remover_consulta(1);
+CALL emitir_receita(1, 1, 1, 2, '2022-01-01');
+CALL realizar_pagamento(1, 50.00, '2022-01-01');
