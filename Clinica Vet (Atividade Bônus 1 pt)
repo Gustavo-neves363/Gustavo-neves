@@ -1,0 +1,88 @@
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_cors import CORS
+from datetime import datetime
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://usuario:senha@localhost/veterinaria'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+CORS(app)
+
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+class Veterinario(db.Model):
+    __tablename__ = 'veterinario'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50))
+    sobrenome = db.Column(db.String(50))
+    especialidade = db.Column(db.String(100))
+    biografia = db.Column(db.String(500))
+
+class Animal(db.Model):
+    __tablename__ = 'animal'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50))
+    especie = db.Column(db.String(50))
+    raca = db.Column(db.String(50))
+    idade = db.Column(db.Integer)
+    dono_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+class Usuario(db.Model):
+    __tablename__ = 'usuario'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50))
+    telefone = db.Column(db.String(15))
+    dt_cadastro = db.Column(db.Date)
+
+class Consulta(db.Model):
+    __tablename__ = 'consulta'
+    id = db.Column(db.Integer, primary_key=True)
+    animal_id = db.Column(db.Integer, db.ForeignKey('animal.id'))
+    veterinario_id = db.Column(db.Integer, db.ForeignKey('veterinario.id'))
+    dt_consulta = db.Column(db.DateTime)
+    observacoes = db.Column(db.Text)
+
+class Receita(db.Model):
+    __tablename__ = 'receita'
+    id = db.Column(db.Integer, primary_key=True)
+    consulta_id = db.Column(db.Integer, db.ForeignKey('consulta.id'))
+    descricao = db.Column(db.Text)
+    data_emissao = db.Column(db.Date)
+
+class Multa(db.Model):
+    __tablename__ = 'multa'
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    valor_multa = db.Column(db.Numeric(10, 2))
+    data_multa = db.Column(db.Date)
+
+class Mensagem(db.Model):
+    __tablename__ = 'mensagens'
+    id = db.Column(db.Integer, primary_key=True)
+    destinatario = db.Column(db.String(255), nullable=False)
+    assunto = db.Column(db.String(255), nullable=False)
+    corpo = db.Column(db.Text)
+    data_envio = db.Column(db.DateTime, default=datetime.utcnow)
+
+class AnimalAtualizado(db.Model):
+    __tablename__ = 'animal_atualizado'
+    id = db.Column(db.Integer, primary_key=True)
+    animal_id = db.Column(db.Integer, db.ForeignKey('animal.id'), nullable=False)
+    nome = db.Column(db.String(50), nullable=False)
+    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+class AnimalExcluido(db.Model):
+    __tablename__ = 'animal_excluido'
+    id = db.Column(db.Integer, primary_key=True)
+    animal_id = db.Column(db.Integer, db.ForeignKey('animal.id'), nullable=False)
+    nome = db.Column(db.String(50), nullable=False)
+    data_exclusao = db.Column(db.DateTime, default=datetime.utcnow)
+
+@app.route('/')
+def index():
+    return "API da Clínica Veterinária"
+
+if __name__ == '__main__':
+    app.run(debug=True)
